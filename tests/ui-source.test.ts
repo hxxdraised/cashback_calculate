@@ -9,4 +9,12 @@ describe('period form markup', () => {
     expect(source).toContain('<th>Абонемент</th>');
     expect(source).toContain('<th>Цена</th>');
   });
+
+  it('keeps periods collapsible and client results numbered', () => {
+    const source = readFileSync('src/App.tsx', 'utf8');
+
+    expect(source).toContain('className="period-summary"');
+    expect(source).toContain('aria-expanded={isExpanded}');
+    expect(source).toContain('className="number-column"');
+  });
 });

@@ -1,4 +1,19 @@
-import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { ChangeEvent, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  CalendarDays,
+  ChevronDown,
+  CircleAlert,
+  Download,
+  FileDown,
+  FileUp,
+  Percent,
+  Plus,
+  ReceiptText,
+  Settings,
+  Trash2,
+  Users,
+  Wallet,
+} from 'lucide-react';
 import dataUrl from '../data/all_21.01.26_30.06.26.xlsx?url';
 import {
   calculateClientSummaries,
@@ -23,6 +38,7 @@ const numberFormat = new Intl.NumberFormat('ru-RU');
 export default function App() {
   const [purchases, setPurchases] = useState<PurchaseRecord[]>([]);
   const [settings, setSettings] = useState<CashbackSettings | null>(null);
+  const [expandedPeriodIds, setExpandedPeriodIds] = useState<Set<string>>(new Set());
   const [loadingMessage, setLoadingMessage] = useState('Загружаем выгрузку из data...');
   const [importError, setImportError] = useState('');
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -50,6 +66,7 @@ export default function App() {
 
         setPurchases(loadedPurchases);
         setSettings(nextSettings);
+        setExpandedPeriodIds(new Set(nextSettings.periods.map((period) => period.id)));
         setLoadingMessage('');
       })
       .catch((error: unknown) => {
@@ -120,12 +137,14 @@ export default function App() {
   }
 
   function addPeriod() {
+    const periodId = crypto.randomUUID();
+
     updateSettings((current) => ({
       ...current,
       periods: [
         ...current.periods,
         {
-          id: crypto.randomUUID(),
+          id: periodId,
           name: `Период ${current.periods.length + 1}`,
           startDate: current.periods.at(-1)?.endDate ?? '',
           endDate: current.periods.at(-1)?.endDate ?? '',
@@ -133,6 +152,7 @@ export default function App() {
         },
       ],
     }));
+    setExpandedPeriodIds((current) => new Set(current).add(periodId));
   }
 
   function removePeriod(periodId: string) {
@@ -140,6 +160,25 @@ export default function App() {
       ...current,
       periods: current.periods.filter((period) => period.id !== periodId),
     }));
+    setExpandedPeriodIds((current) => {
+      const next = new Set(current);
+      next.delete(periodId);
+      return next;
+    });
+  }
+
+  function togglePeriod(periodId: string) {
+    setExpandedPeriodIds((current) => {
+      const next = new Set(current);
+
+      if (next.has(periodId)) {
+        next.delete(periodId);
+      } else {
+        next.add(periodId);
+      }
+
+      return next;
+    });
   }
 
   function exportSettings() {
@@ -165,6 +204,7 @@ export default function App() {
       .then((content) => {
         const imported = normalizeSettingsForSubscriptions(deserializeSettings(content), subscriptionNames);
         setSettings(imported);
+        setExpandedPeriodIds(new Set(imported.periods.map((period) => period.id)));
         setImportError('');
       })
       .catch((error: unknown) => {
@@ -186,10 +226,12 @@ export default function App() {
           </p>
         </div>
         <div className="header-actions">
-          <button type="button" onClick={exportSettings}>
+          <button type="button" className="button-with-icon secondary-button" onClick={exportSettings}>
+            <FileDown size={17} aria-hidden="true" />
             Экспорт JSON
           </button>
-          <button type="button" onClick={() => importInputRef.current?.click()}>
+          <button type="button" className="button-with-icon" onClick={() => importInputRef.current?.click()}>
+            <FileUp size={17} aria-hidden="true" />
             Импорт JSON
           </button>
           <input
@@ -204,10 +246,10 @@ export default function App() {
 
       <section className="overview-band" aria-label="Сводка выгрузки">
         <div className="metrics">
-          <Metric label="Покупок в Excel" value={String(purchases.length)} />
-          <Metric label="Учитывается" value={String(eligiblePurchases.length)} />
-          <Metric label="Типов абонементов" value={String(subscriptionNames.length)} />
-          <Metric label="Период выгрузки" value={dateRange} />
+          <Metric icon={<ReceiptText size={19} aria-hidden="true" />} label="Покупок в Excel" value={String(purchases.length)} />
+          <Metric icon={<CircleAlert size={19} aria-hidden="true" />} label="Учитывается" value={String(eligiblePurchases.length)} />
+          <Metric icon={<Wallet size={19} aria-hidden="true" />} label="Типов абонементов" value={String(subscriptionNames.length)} />
+          <Metric icon={<CalendarDays size={19} aria-hidden="true" />} label="Период выгрузки" value={dateRange} />
         </div>
       </section>
 
@@ -221,16 +263,23 @@ export default function App() {
           <div className="section-heading">
             <div>
               <p className="eyebrow">Настройки</p>
-              <h2 id="settings-title">Периоды цен</h2>
+              <h2 id="settings-title">
+                <Settings size={20} aria-hidden="true" />
+                Периоды цен
+              </h2>
               <p className="section-copy">Заполните цены для каждого периода, чтобы расчет стал доступен.</p>
             </div>
-            <button type="button" onClick={addPeriod}>
+            <button type="button" className="button-with-icon" onClick={addPeriod}>
+              <Plus size={17} aria-hidden="true" />
               Добавить период
             </button>
           </div>
 
           <label className="cashback-input">
-            <span>Процент кешбека</span>
+            <span>
+              <Percent size={18} aria-hidden="true" />
+              Процент кешбека
+            </span>
             <input
               type="number"
               min="0"
@@ -246,91 +295,111 @@ export default function App() {
           </label>
 
           <div className="period-list">
-            {settings.periods.map((period) => (
-              <article className="period-block" key={period.id}>
-                <div className="period-block-title">
-                  <strong>{period.name || 'Период без названия'}</strong>
-                  <span>
-                    {period.startDate || 'дата начала'} - {period.endDate || 'дата окончания'}
-                  </span>
-                </div>
-                <div className="period-controls">
-                  <label className="period-name-field">
-                    <span>Название</span>
-                    <input
-                      aria-label="Название периода"
-                      className="period-name"
-                      value={period.name}
-                      onChange={(event) => updatePeriod(period.id, (item) => ({ ...item, name: event.target.value }))}
-                    />
-                  </label>
-                  <label>
-                    <span>С</span>
-                    <input
-                      type="date"
-                      value={period.startDate}
-                      onChange={(event) =>
-                        updatePeriod(period.id, (item) => ({ ...item, startDate: event.target.value }))
-                      }
-                    />
-                  </label>
-                  <label>
-                    <span>По</span>
-                    <input
-                      type="date"
-                      value={period.endDate}
-                      onChange={(event) =>
-                        updatePeriod(period.id, (item) => ({ ...item, endDate: event.target.value }))
-                      }
-                    />
-                  </label>
+            {settings.periods.map((period) => {
+              const isExpanded = expandedPeriodIds.has(period.id);
+
+              return (
+                <article className={`period-block ${isExpanded ? 'period-block--open' : ''}`} key={period.id}>
                   <button
                     type="button"
-                    className="ghost-button period-remove"
-                    disabled={settings.periods.length === 1}
-                    onClick={() => removePeriod(period.id)}
+                    className="period-summary"
+                    aria-expanded={isExpanded}
+                    onClick={() => togglePeriod(period.id)}
                   >
-                    Удалить
+                    <span className="period-summary-main">
+                      <strong>{period.name || 'Период без названия'}</strong>
+                      <span>
+                        {period.startDate || 'дата начала'} - {period.endDate || 'дата окончания'}
+                      </span>
+                    </span>
+                    <ChevronDown size={20} aria-hidden="true" />
                   </button>
-                </div>
-                <div className="price-table-wrap">
-                  <table className="price-table">
-                    <thead>
-                      <tr>
-                        <th>Абонемент</th>
-                        <th>Цена</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {subscriptionNames.map((name) => (
-                        <tr key={name}>
-                          <td>{name}</td>
-                          <td>
-                            <input
-                              aria-label={`Цена: ${name}`}
-                              className="price-input"
-                              type="number"
-                              min="0"
-                              step="1"
-                              value={period.pricesBySubscriptionName[name] ?? ''}
-                              onChange={(event) =>
-                                updatePeriod(period.id, (item) => ({
-                                  ...item,
-                                  pricesBySubscriptionName: {
-                                    ...item.pricesBySubscriptionName,
-                                    [name]: event.target.value === '' ? null : Number(event.target.value),
-                                  },
-                                }))
-                              }
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </article>
-            ))}
+
+                  {isExpanded ? (
+                    <div className="period-details">
+                      <div className="period-controls">
+                        <label className="period-name-field">
+                          <span>Название</span>
+                          <input
+                            aria-label="Название периода"
+                            className="period-name"
+                            value={period.name}
+                            onChange={(event) =>
+                              updatePeriod(period.id, (item) => ({ ...item, name: event.target.value }))
+                            }
+                          />
+                        </label>
+                        <label>
+                          <span>С</span>
+                          <input
+                            type="date"
+                            value={period.startDate}
+                            onChange={(event) =>
+                              updatePeriod(period.id, (item) => ({ ...item, startDate: event.target.value }))
+                            }
+                          />
+                        </label>
+                        <label>
+                          <span>По</span>
+                          <input
+                            type="date"
+                            value={period.endDate}
+                            onChange={(event) =>
+                              updatePeriod(period.id, (item) => ({ ...item, endDate: event.target.value }))
+                            }
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          className="ghost-button period-remove button-with-icon"
+                          disabled={settings.periods.length === 1}
+                          onClick={() => removePeriod(period.id)}
+                        >
+                          <Trash2 size={16} aria-hidden="true" />
+                          Удалить
+                        </button>
+                      </div>
+                      <div className="price-table-wrap">
+                        <table className="price-table">
+                          <thead>
+                            <tr>
+                              <th>Абонемент</th>
+                              <th>Цена</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {subscriptionNames.map((name) => (
+                              <tr key={name}>
+                                <td>{name}</td>
+                                <td>
+                                  <input
+                                    aria-label={`Цена: ${name}`}
+                                    className="price-input"
+                                    type="number"
+                                    min="0"
+                                    step="1"
+                                    value={period.pricesBySubscriptionName[name] ?? ''}
+                                    onChange={(event) =>
+                                      updatePeriod(period.id, (item) => ({
+                                        ...item,
+                                        pricesBySubscriptionName: {
+                                          ...item.pricesBySubscriptionName,
+                                          [name]: event.target.value === '' ? null : Number(event.target.value),
+                                        },
+                                      }))
+                                    }
+                                  />
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ) : null}
+                </article>
+              );
+            })}
           </div>
         </section>
 
@@ -338,10 +407,14 @@ export default function App() {
           <div className="section-heading">
             <div>
               <p className="eyebrow">Отчет</p>
-              <h2 id="results-title">Итог по клиентам</h2>
+              <h2 id="results-title">
+                <Users size={20} aria-hidden="true" />
+                Итог по клиентам
+              </h2>
               <p className="section-copy">CSV экспортирует текущую сводку после успешной валидации.</p>
             </div>
-            <button type="button" disabled={summaries.length === 0} onClick={exportCsv}>
+            <button type="button" className="button-with-icon" disabled={summaries.length === 0} onClick={exportCsv}>
+              <Download size={17} aria-hidden="true" />
               Экспорт CSV
             </button>
           </div>
@@ -350,6 +423,7 @@ export default function App() {
             <table>
               <thead>
                 <tr>
+                  <th className="number-column">№</th>
                   <th>Клиент</th>
                   <th>Покупок</th>
                   <th>Расчетная сумма</th>
@@ -359,13 +433,14 @@ export default function App() {
               <tbody>
                 {summaries.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="empty-cell">
+                    <td colSpan={5} className="empty-cell">
                       Заполните цены и исправьте ошибки валидации, чтобы увидеть расчет.
                     </td>
                   </tr>
                 ) : (
-                  summaries.map((summary) => (
+                  summaries.map((summary, index) => (
                     <tr key={summary.clientName}>
+                      <td className="number-column">{index + 1}</td>
                       <td>{summary.clientName}</td>
                       <td>{summary.purchasesCount}</td>
                       <td>{numberFormat.format(summary.calculatedTotal)} ₽</td>
@@ -382,11 +457,14 @@ export default function App() {
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
     <div className="metric">
-      <span>{label}</span>
-      <strong>{value}</strong>
+      <span className="metric-icon">{icon}</span>
+      <div>
+        <span>{label}</span>
+        <strong>{value}</strong>
+      </div>
     </div>
   );
 }
@@ -394,7 +472,10 @@ function Metric({ label, value }: { label: string; value: string }) {
 function Notice({ tone, messages }: { tone: 'danger' | 'warning'; messages: string[] }) {
   return (
     <section className={`notice notice--${tone}`} role="status">
-      <strong>{tone === 'danger' ? 'Ошибка' : 'Нужно заполнить'}</strong>
+      <strong>
+        <CircleAlert size={18} aria-hidden="true" />
+        {tone === 'danger' ? 'Ошибка' : 'Нужно заполнить'}
+      </strong>
       <ul>
         {messages.map((message) => (
           <li key={message}>{message}</li>
