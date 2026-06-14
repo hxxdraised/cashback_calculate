@@ -18,7 +18,7 @@ import {
   UserX,
   Wallet,
 } from 'lucide-react';
-import dataUrl from '../data/all_21.01.26_30.06.26.xlsx?url';
+import dataUrl from '../data/all_21.01.26_14.06.26.xlsx?url';
 import {
   calculateClientSummaries,
   formatDateRu,

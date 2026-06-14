@@ -5,7 +5,7 @@ import { parsePurchasesWorkbook } from '../src/domain/excel';
 
 describe('real Excel export', () => {
   it('читает текущую выгрузку из data и извлекает покупки абонементов', () => {
-    const workbook = readFileSync('data/all_21.01.26_30.06.26.xlsx');
+    const workbook = readFileSync('data/all_21.01.26_14.06.26.xlsx');
     const data = new Uint8Array(workbook).buffer;
     const purchases = parsePurchasesWorkbook(data);
     const subscriptionNames = getSubscriptionNames(purchases);
