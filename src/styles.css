@@ -149,6 +149,13 @@ input:focus {
   gap: 10px;
 }
 
+.report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .button-with-icon {
   display: inline-flex;
   align-items: center;
@@ -335,6 +342,42 @@ h2 {
   margin-bottom: 16px;
 }
 
+.report-counters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0 0 14px;
+}
+
+.status-counter {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #e1e8e4;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #f8faf9;
+}
+
+.status-counter svg {
+  color: #17655e;
+}
+
+.status-counter span {
+  color: #52625f;
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.status-counter strong {
+  color: #17211f;
+}
+
+.status-counter--inactive svg {
+  color: #9a4f2d;
+}
+
 .cashback-input {
   display: grid;
   grid-template-columns: 1fr 118px;
@@ -492,7 +535,7 @@ h2 {
 table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 620px;
+  min-width: 680px;
 }
 
 th,
@@ -527,6 +570,38 @@ tbody tr:last-child td {
   width: 46px;
   color: #7c8b87;
   text-align: right;
+}
+
+.active-column {
+  width: 42px;
+  padding-right: 6px;
+  padding-left: 6px;
+  text-align: center;
+}
+
+th.active-column {
+  color: #17655e;
+}
+
+.active-column svg {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.status-checkbox {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+}
+
+.status-checkbox input {
+  width: 18px;
+  min-height: 18px;
+  height: 18px;
+  accent-color: #17655e;
+  cursor: pointer;
 }
 
 .empty-cell {
@@ -611,13 +686,20 @@ tbody tr:last-child td {
   }
 
   .header-actions,
+  .report-actions,
   .header-actions button,
+  .report-actions button,
   .section-heading button {
     width: 100%;
   }
 
-  .header-actions {
+  .header-actions,
+  .report-actions {
     flex-direction: column;
+  }
+
+  .report-counters {
+    grid-template-columns: 1fr;
   }
 
   .button-with-icon {
@@ -667,7 +749,7 @@ tbody tr:last-child td {
   }
 
   table {
-    min-width: 560px;
+    min-width: 640px;
   }
 }
 

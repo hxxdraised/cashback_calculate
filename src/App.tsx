@@ -1,10 +1,12 @@
 import { ChangeEvent, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  BadgeCheck,
   CalendarDays,
   ChevronDown,
   CircleAlert,
   Download,
   FileDown,
+  FileText,
   FileUp,
   Percent,
   Plus,
@@ -12,6 +14,8 @@ import {
   Settings,
   Trash2,
   Users,
+  UserCheck,
+  UserX,
   Wallet,
 } from 'lucide-react';
 import dataUrl from '../data/all_21.01.26_30.06.26.xlsx?url';
@@ -22,7 +26,7 @@ import {
   getSubscriptionNames,
   validateSettings,
 } from './domain/cashback';
-import { downloadTextFile, summariesToCsv } from './domain/export';
+import { createCashbackDocxBlob, downloadBlob, downloadTextFile, summariesToCsv } from './domain/export';
 import { loadPurchasesFromUrl } from './domain/excel';
 import {
   createInitialSettings,
@@ -30,14 +34,27 @@ import {
   normalizeSettingsForSubscriptions,
   serializeSettings,
 } from './domain/settings';
-import { loadStoredSettings, saveStoredSettings } from './domain/storage';
-import type { CashbackSettings, PricePeriod, PurchaseRecord } from './domain/types';
+import {
+  loadStoredClientStatuses,
+  loadStoredSettings,
+  saveStoredClientStatuses,
+  saveStoredSettings,
+} from './domain/storage';
+import type { CashbackSettings, ClientStatusMap, PricePeriod, PurchaseRecord } from './domain/types';
 
 const numberFormat = new Intl.NumberFormat('ru-RU');
+const rubleFormat = new Intl.NumberFormat('ru-RU');
 
 export default function App() {
   const [purchases, setPurchases] = useState<PurchaseRecord[]>([]);
   const [settings, setSettings] = useState<CashbackSettings | null>(null);
+  const [clientStatuses, setClientStatuses] = useState<ClientStatusMap>(() => {
+    try {
+      return loadStoredClientStatuses();
+    } catch {
+      return {};
+    }
+  });
   const [expandedPeriodIds, setExpandedPeriodIds] = useState<Set<string>>(new Set());
   const [loadingMessage, setLoadingMessage] = useState('Загружаем выгрузку из data...');
   const [importError, setImportError] = useState('');
@@ -88,6 +105,10 @@ export default function App() {
     }
   }, [settings]);
 
+  useEffect(() => {
+    saveStoredClientStatuses(clientStatuses);
+  }, [clientStatuses]);
+
   const subscriptionNames = useMemo(() => getSubscriptionNames(purchases), [purchases]);
   const eligiblePurchases = useMemo(() => getEligiblePurchases(purchases), [purchases]);
   const validationErrors = useMemo(
@@ -101,6 +122,16 @@ export default function App() {
 
     return calculateClientSummaries(purchases, settings);
   }, [purchases, settings, validationErrors]);
+  const reportRows = useMemo(
+    () =>
+      summaries.map((summary) => ({
+        ...summary,
+        isActive: clientStatuses[summary.clientName] ?? true,
+      })),
+    [clientStatuses, summaries],
+  );
+  const activeClientsCount = reportRows.filter((row) => row.isActive).length;
+  const inactiveClientsCount = reportRows.length - activeClientsCount;
 
   const dateRange = useMemo(() => {
     if (purchases.length === 0) {
@@ -109,6 +140,7 @@ export default function App() {
 
     return `${formatDateRu(purchases[0].date)} - ${formatDateRu(purchases[purchases.length - 1].date)}`;
   }, [purchases]);
+  const docxDateRange = dateRange.replace(' - ', '-');
 
   if (loadingMessage) {
     return (
@@ -191,6 +223,18 @@ export default function App() {
 
   function exportCsv() {
     downloadTextFile('cashback-summary.csv', summariesToCsv(summaries), 'text/csv;charset=utf-8');
+  }
+
+  async function exportDocx() {
+    const blob = await createCashbackDocxBlob(reportRows, docxDateRange, (value) => rubleFormat.format(value));
+    downloadBlob('cashback-clients.docx', blob);
+  }
+
+  function updateClientStatus(clientName: string, isActive: boolean) {
+    setClientStatuses((current) => ({
+      ...current,
+      [clientName]: isActive,
+    }));
   }
 
   function handleImport(event: ChangeEvent<HTMLInputElement>) {
@@ -411,12 +455,31 @@ export default function App() {
                 <Users size={20} aria-hidden="true" />
                 Итог по клиентам
               </h2>
-              <p className="section-copy">CSV экспортирует текущую сводку после успешной валидации.</p>
+              <p className="section-copy">Отметьте клиентов с активным абонементом и экспортируйте нужный формат.</p>
             </div>
-            <button type="button" className="button-with-icon" disabled={summaries.length === 0} onClick={exportCsv}>
-              <Download size={17} aria-hidden="true" />
-              Экспорт CSV
-            </button>
+            <div className="report-actions">
+              <button type="button" className="button-with-icon secondary-button" disabled={summaries.length === 0} onClick={exportDocx}>
+                <FileText size={17} aria-hidden="true" />
+                DOCX
+              </button>
+              <button type="button" className="button-with-icon" disabled={summaries.length === 0} onClick={exportCsv}>
+                <Download size={17} aria-hidden="true" />
+                CSV
+              </button>
+            </div>
+          </div>
+
+          <div className="report-counters" aria-label="Счетчики статусов клиентов">
+            <div className="status-counter status-counter--active">
+              <UserCheck size={18} aria-hidden="true" />
+              <span>Активные</span>
+              <strong>{activeClientsCount}</strong>
+            </div>
+            <div className="status-counter status-counter--inactive">
+              <UserX size={18} aria-hidden="true" />
+              <span>Неактивные</span>
+              <strong>{inactiveClientsCount}</strong>
+            </div>
           </div>
 
           <div className="table-wrap">
@@ -424,6 +487,9 @@ export default function App() {
               <thead>
                 <tr>
                   <th className="number-column">№</th>
+                  <th className="active-column" title="Активный абонемент" aria-label="Активный абонемент">
+                    <BadgeCheck size={17} aria-hidden="true" />
+                  </th>
                   <th>Клиент</th>
                   <th>Покупок</th>
                   <th>Расчетная сумма</th>
@@ -433,14 +499,26 @@ export default function App() {
               <tbody>
                 {summaries.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="empty-cell">
+                    <td colSpan={6} className="empty-cell">
                       Заполните цены и исправьте ошибки валидации, чтобы увидеть расчет.
                     </td>
                   </tr>
                 ) : (
-                  summaries.map((summary, index) => (
+                  reportRows.map((summary, index) => (
                     <tr key={summary.clientName}>
                       <td className="number-column">{index + 1}</td>
+                      <td className="active-column">
+                        <label className="status-checkbox" title={summary.isActive ? 'Активен' : 'Неактивен'}>
+                          <input
+                            type="checkbox"
+                            checked={summary.isActive}
+                            onChange={(event) => updateClientStatus(summary.clientName, event.target.checked)}
+                          />
+                          <span className="visually-hidden">
+                            {summary.isActive ? 'Активен' : 'Неактивен'}: {summary.clientName}
+                          </span>
+                        </label>
+                      </td>
                       <td>{summary.clientName}</td>
                       <td>{summary.purchasesCount}</td>
                       <td>{numberFormat.format(summary.calculatedTotal)} ₽</td>

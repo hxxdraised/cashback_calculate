@@ -17,4 +17,12 @@ describe('period form markup', () => {
     expect(source).toContain('aria-expanded={isExpanded}');
     expect(source).toContain('className="number-column"');
   });
+
+  it('renders client activity controls and docx export', () => {
+    const source = readFileSync('src/App.tsx', 'utf8');
+
+    expect(source).toContain('className="active-column"');
+    expect(source).toContain('type="checkbox"');
+    expect(source).toContain('exportDocx');
+  });
 });

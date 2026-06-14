@@ -28,6 +28,12 @@ export interface ClientCashbackSummary {
   cashback: number;
 }
 
+export type ClientStatusMap = Record<string, boolean>;
+
+export interface ClientCashbackExportRow extends ClientCashbackSummary {
+  isActive: boolean;
+}
+
 export interface PurchaseCalculation {
   purchase: PurchaseRecord;
   period: PricePeriod;
