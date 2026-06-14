@@ -143,11 +143,10 @@ describe('cashback domain', () => {
     };
 
     expect(validateSettings(purchases, brokenSettings)).toEqual(expect.arrayContaining([
-      'Покупка от 02.02.2026 не попадает ни в один период цен.',
-      'Покупка от 04.03.2026 не попадает ни в один период цен.',
+      'Не настроен период цен: 01.02.2026 - 04.03.2026.',
       'В периоде "Короткий период" не указана цена для "Абонемент 8П без скидки".',
       'В периоде "Короткий период" не указана цена для "Абонемент 4П скидка пк".',
     ]));
-    expect(validateSettings(purchases, brokenSettings)).toHaveLength(4);
+    expect(validateSettings(purchases, brokenSettings)).toHaveLength(3);
   });
 });

@@ -290,10 +290,10 @@ export default function App() {
 
       <section className="overview-band" aria-label="Сводка выгрузки">
         <div className="metrics">
-          <Metric icon={<ReceiptText size={19} aria-hidden="true" />} label="Покупок в Excel" value={String(purchases.length)} />
-          <Metric icon={<CircleAlert size={19} aria-hidden="true" />} label="Учитывается" value={String(eligiblePurchases.length)} />
-          <Metric icon={<Wallet size={19} aria-hidden="true" />} label="Типов абонементов" value={String(subscriptionNames.length)} />
-          <Metric icon={<CalendarDays size={19} aria-hidden="true" />} label="Период выгрузки" value={dateRange} />
+          <Metric icon={<ReceiptText size={22} aria-hidden="true" />} label="Покупок в Excel" value={String(purchases.length)} />
+          <Metric icon={<BadgeCheck size={22} aria-hidden="true" />} label="Учитывается" value={String(eligiblePurchases.length)} />
+          <Metric icon={<Wallet size={22} aria-hidden="true" />} label="Типов абонементов" value={String(subscriptionNames.length)} />
+          <Metric icon={<CalendarDays size={22} aria-hidden="true" />} label="Период выгрузки" value={dateRange} />
         </div>
       </section>
 
@@ -310,13 +310,16 @@ export default function App() {
               <h2 id="settings-title">
                 <Settings size={20} aria-hidden="true" />
                 Периоды цен
+                {validationErrors.length > 0 ? (
+                  <CircleAlert
+                    className="validation-warning-icon"
+                    size={18}
+                    aria-label="Есть ошибки в настройке периодов"
+                  />
+                ) : null}
               </h2>
               <p className="section-copy">Заполните цены для каждого периода, чтобы расчет стал доступен.</p>
             </div>
-            <button type="button" className="button-with-icon" onClick={addPeriod}>
-              <Plus size={17} aria-hidden="true" />
-              Добавить период
-            </button>
           </div>
 
           <label className="cashback-input">
@@ -350,13 +353,15 @@ export default function App() {
                     aria-expanded={isExpanded}
                     onClick={() => togglePeriod(period.id)}
                   >
+                    <CalendarDays className="period-summary-icon" size={19} aria-hidden="true" />
                     <span className="period-summary-main">
                       <strong>{period.name || 'Период без названия'}</strong>
                       <span>
-                        {period.startDate || 'дата начала'} - {period.endDate || 'дата окончания'}
+                        {formatDateKeyRu(period.startDate) || 'дата начала'} -{' '}
+                        {formatDateKeyRu(period.endDate) || 'дата окончания'}
                       </span>
                     </span>
-                    <ChevronDown size={20} aria-hidden="true" />
+                    <ChevronDown className="period-summary-chevron" size={20} aria-hidden="true" />
                   </button>
 
                   {isExpanded ? (
@@ -445,6 +450,11 @@ export default function App() {
               );
             })}
           </div>
+
+          <button type="button" className="button-with-icon add-period-button" onClick={addPeriod}>
+            <Plus size={17} aria-hidden="true" />
+            Добавить период
+          </button>
         </section>
 
         <section className="results-panel" aria-labelledby="results-title">
@@ -535,12 +545,21 @@ export default function App() {
   );
 }
 
+function formatDateKeyRu(dateKey: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+    return '';
+  }
+
+  const [year, month, day] = dateKey.split('-');
+  return `${day}.${month}.${year}`;
+}
+
 function Metric({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
     <div className="metric">
       <span className="metric-icon">{icon}</span>
       <div>
-        <span>{label}</span>
+        <span className="metric-label">{label}</span>
         <strong>{value}</strong>
       </div>
     </div>

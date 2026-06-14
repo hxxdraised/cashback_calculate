@@ -135,10 +135,8 @@ export function validateSettings(purchases: PurchaseRecord[], settings: Cashback
     }
   }
 
-  for (const purchase of eligiblePurchases) {
-    if (!findPeriodForDate(purchase.date, settings.periods)) {
-      errors.push(`Покупка от ${formatDateRu(purchase.date)} не попадает ни в один период цен.`);
-    }
+  for (const range of findUncoveredDateRanges(eligiblePurchases, sortedPeriods)) {
+    errors.push(`Не настроен период цен: ${formatDateRu(range.start)} - ${formatDateRu(range.end)}.`);
   }
 
   for (const period of settings.periods) {
@@ -151,6 +149,70 @@ export function validateSettings(purchases: PurchaseRecord[], settings: Cashback
   }
 
   return Array.from(new Set(errors));
+}
+
+function findUncoveredDateRanges(
+  purchases: PurchaseRecord[],
+  sortedPeriods: PricePeriod[],
+): Array<{ start: Date; end: Date }> {
+  if (purchases.length === 0) {
+    return [];
+  }
+
+  const sortedPurchaseDates = purchases.map((purchase) => toDateKey(purchase.date)).sort();
+  const firstPurchaseDate = sortedPurchaseDates[0];
+  const lastPurchaseDate = sortedPurchaseDates[sortedPurchaseDates.length - 1];
+  const ranges: Array<{ start: Date; end: Date }> = [];
+  let nextUncoveredStart = firstPurchaseDate;
+
+  for (const period of sortedPeriods) {
+    if (!period.startDate || !period.endDate || period.startDate > period.endDate) {
+      continue;
+    }
+
+    if (period.endDate < nextUncoveredStart) {
+      continue;
+    }
+
+    if (period.startDate > lastPurchaseDate) {
+      break;
+    }
+
+    if (period.startDate > nextUncoveredStart) {
+      ranges.push({
+        start: parseDateKey(nextUncoveredStart),
+        end: parseDateKey(addDays(period.startDate, -1)),
+      });
+    }
+
+    if (period.endDate >= nextUncoveredStart) {
+      nextUncoveredStart = addDays(period.endDate, 1);
+    }
+
+    if (nextUncoveredStart > lastPurchaseDate) {
+      return ranges;
+    }
+  }
+
+  if (nextUncoveredStart <= lastPurchaseDate) {
+    ranges.push({
+      start: parseDateKey(nextUncoveredStart),
+      end: parseDateKey(lastPurchaseDate),
+    });
+  }
+
+  return ranges;
+}
+
+function addDays(dateKey: string, days: number): string {
+  const date = parseDateKey(dateKey);
+  date.setDate(date.getDate() + days);
+  return toDateKey(date);
+}
+
+function parseDateKey(dateKey: string): Date {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  return new Date(year, month - 1, day);
 }
 
 export function toDateKey(date: Date): string {
