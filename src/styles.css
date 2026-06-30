@@ -585,6 +585,42 @@ th {
   background: #f6f9f7;
 }
 
+.sort-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  min-height: 24px;
+  border: 0;
+  border-radius: 5px;
+  padding: 2px 4px;
+  color: inherit;
+  background: transparent;
+  box-shadow: none;
+  font: inherit;
+  text-align: left;
+}
+
+.sort-button:hover:not(:disabled) {
+  color: #17655e;
+  background: #e8f4f1;
+  box-shadow: none;
+  transform: none;
+}
+
+.sort-button svg {
+  flex: 0 0 auto;
+  color: #8a9894;
+}
+
+.sort-button--active {
+  color: #17655e;
+}
+
+.sort-button--active svg {
+  color: currentColor;
+}
+
 tbody tr:last-child td {
   border-bottom: 0;
 }
@@ -609,6 +645,13 @@ tbody tr:last-child td {
 
 th.active-column {
   color: #17655e;
+}
+
+.active-column .sort-button {
+  justify-content: center;
+  width: 100%;
+  padding-right: 0;
+  padding-left: 0;
 }
 
 .active-column svg {

@@ -1,5 +1,8 @@
 import { ChangeEvent, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   BadgeCheck,
   CalendarDays,
   ChevronDown,
@@ -46,6 +49,9 @@ import type { CashbackSettings, ClientStatusMap, PricePeriod, PurchaseRecord } f
 const numberFormat = new Intl.NumberFormat('ru-RU');
 const rubleFormat = new Intl.NumberFormat('ru-RU');
 
+type SortKey = 'isActive' | 'clientName' | 'purchasesCount' | 'calculatedTotal' | 'cashback';
+type SortDirection = 'asc' | 'desc';
+
 export default function App() {
   const [purchases, setPurchases] = useState<PurchaseRecord[]>([]);
   const [settings, setSettings] = useState<CashbackSettings | null>(null);
@@ -57,6 +63,10 @@ export default function App() {
     }
   });
   const [expandedPeriodIds, setExpandedPeriodIds] = useState<Set<string>>(new Set());
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection }>({
+    key: 'clientName',
+    direction: 'asc',
+  });
   const [loadingMessage, setLoadingMessage] = useState('Загружаем выгрузку из data...');
   const [importError, setImportError] = useState('');
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -131,6 +141,27 @@ export default function App() {
       })),
     [clientStatuses, summaries],
   );
+  const sortedReportRows = useMemo(() => {
+    const directionMultiplier = sortConfig.direction === 'asc' ? 1 : -1;
+
+    return [...reportRows].sort((left, right) => {
+      let result = 0;
+
+      if (sortConfig.key === 'clientName') {
+        result = left.clientName.localeCompare(right.clientName, 'ru');
+      } else if (sortConfig.key === 'isActive') {
+        result = Number(left.isActive) - Number(right.isActive);
+      } else {
+        result = left[sortConfig.key] - right[sortConfig.key];
+      }
+
+      if (result === 0) {
+        return left.clientName.localeCompare(right.clientName, 'ru');
+      }
+
+      return result * directionMultiplier;
+    });
+  }, [reportRows, sortConfig]);
   const activeClientsCount = reportRows.filter((row) => row.isActive).length;
   const inactiveClientsCount = reportRows.length - activeClientsCount;
 
@@ -245,6 +276,21 @@ export default function App() {
       ...current,
       [clientName]: isActive,
     }));
+  }
+
+  function toggleSort(key: SortKey) {
+    setSortConfig((current) => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+    }));
+  }
+
+  function getSortLabel(key: SortKey, label: string): string {
+    if (sortConfig.key !== key) {
+      return `${label}: включить сортировку`;
+    }
+
+    return `${label}: сортировка ${sortConfig.direction === 'asc' ? 'по возрастанию' : 'по убыванию'}`;
   }
 
   function handleImport(event: ChangeEvent<HTMLInputElement>) {
@@ -513,12 +559,55 @@ export default function App() {
                 <tr>
                   <th className="number-column">№</th>
                   <th className="active-column" title="Активный абонемент" aria-label="Активный абонемент">
-                    <BadgeCheck size={17} aria-hidden="true" />
+                    <SortableHeader
+                      active={sortConfig.key === 'isActive'}
+                      direction={sortConfig.direction}
+                      label={getSortLabel('isActive', 'Активный абонемент')}
+                      onClick={() => toggleSort('isActive')}
+                    >
+                      <BadgeCheck size={17} aria-hidden="true" />
+                    </SortableHeader>
                   </th>
-                  <th>Клиент</th>
-                  <th>Покупок</th>
-                  <th>Расчетная сумма</th>
-                  <th>Кешбек</th>
+                  <th>
+                    <SortableHeader
+                      active={sortConfig.key === 'clientName'}
+                      direction={sortConfig.direction}
+                      label={getSortLabel('clientName', 'Клиент')}
+                      onClick={() => toggleSort('clientName')}
+                    >
+                      Клиент
+                    </SortableHeader>
+                  </th>
+                  <th>
+                    <SortableHeader
+                      active={sortConfig.key === 'purchasesCount'}
+                      direction={sortConfig.direction}
+                      label={getSortLabel('purchasesCount', 'Покупок')}
+                      onClick={() => toggleSort('purchasesCount')}
+                    >
+                      Покупок
+                    </SortableHeader>
+                  </th>
+                  <th>
+                    <SortableHeader
+                      active={sortConfig.key === 'calculatedTotal'}
+                      direction={sortConfig.direction}
+                      label={getSortLabel('calculatedTotal', 'Потрачено')}
+                      onClick={() => toggleSort('calculatedTotal')}
+                    >
+                      Потрачено
+                    </SortableHeader>
+                  </th>
+                  <th>
+                    <SortableHeader
+                      active={sortConfig.key === 'cashback'}
+                      direction={sortConfig.direction}
+                      label={getSortLabel('cashback', 'Кешбек')}
+                      onClick={() => toggleSort('cashback')}
+                    >
+                      Кешбек
+                    </SortableHeader>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -529,7 +618,7 @@ export default function App() {
                     </td>
                   </tr>
                 ) : (
-                  reportRows.map((summary, index) => (
+                  sortedReportRows.map((summary, index) => (
                     <tr key={summary.clientName}>
                       <td className="number-column">{index + 1}</td>
                       <td className="active-column">
@@ -567,6 +656,35 @@ function formatDateKeyRu(dateKey: string): string {
 
   const [year, month, day] = dateKey.split('-');
   return `${day}.${month}.${year}`;
+}
+
+function SortableHeader({
+  active,
+  children,
+  direction,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  children: ReactNode;
+  direction: SortDirection;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`sort-button ${active ? 'sort-button--active' : ''}`}
+      aria-label={label}
+      aria-sort={active ? (direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+      onClick={onClick}
+    >
+      <span>{children}</span>
+      {!active ? <ArrowUpDown size={14} aria-hidden="true" /> : null}
+      {active && direction === 'asc' ? <ArrowUp size={14} aria-hidden="true" /> : null}
+      {active && direction === 'desc' ? <ArrowDown size={14} aria-hidden="true" /> : null}
+    </button>
+  );
 }
 
 function Metric({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {

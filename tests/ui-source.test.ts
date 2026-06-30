@@ -43,4 +43,18 @@ describe('period form markup', () => {
     expect(styles).toContain('.add-period-button');
     expect(styles).toContain('width: 100%');
   });
+
+  it('renders sortable report table headers', () => {
+    const source = readFileSync('src/App.tsx', 'utf8');
+    const styles = readFileSync('src/styles.css', 'utf8');
+
+    expect(source).toContain('type SortKey');
+    expect(source).toContain('function SortableHeader');
+    expect(source).toContain('toggleSort');
+    expect(source).toContain('sortedReportRows.map');
+    expect(source).toContain('<ArrowUpDown size={14}');
+    expect(source).toContain('<ArrowUp size={14}');
+    expect(source).toContain('<ArrowDown size={14}');
+    expect(styles).toContain('.sort-button');
+  });
 });

@@ -1,7 +1,7 @@
 import type { ClientCashbackExportRow, ClientCashbackSummary } from './types';
 
 export function summariesToCsv(summaries: ClientCashbackSummary[]): string {
-  const header = ['Клиент', 'Покупок', 'Расчетная сумма', 'Кешбек'];
+  const header = ['Клиент', 'Покупок', 'Потрачено', 'Кешбек'];
   const rows = summaries.map((summary) => [
     summary.clientName,
     String(summary.purchasesCount),
