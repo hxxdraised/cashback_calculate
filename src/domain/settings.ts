@@ -1,11 +1,12 @@
 import { getSubscriptionNames, toDateKey } from './cashback';
-import type { CashbackSettings, PricePeriod, PurchaseRecord } from './types';
+import type { CashbackSettings, ClientStatusMap, PricePeriod, PurchaseRecord } from './types';
 
 const settingsVersion = 1;
 
 interface SettingsFile {
   version: number;
   settings: CashbackSettings;
+  clientStatuses?: ClientStatusMap;
 }
 
 export function createInitialSettings(purchases: PurchaseRecord[]): CashbackSettings {
@@ -26,8 +27,14 @@ export function createInitialSettings(purchases: PurchaseRecord[]): CashbackSett
   };
 }
 
-export function serializeSettings(settings: CashbackSettings): string {
-  return JSON.stringify({ version: settingsVersion, settings }, null, 2);
+export function serializeSettings(settings: CashbackSettings, clientStatuses?: ClientStatusMap): string {
+  const file: SettingsFile = { version: settingsVersion, settings };
+
+  if (clientStatuses) {
+    file.clientStatuses = clientStatuses;
+  }
+
+  return JSON.stringify(file, null, 2);
 }
 
 export function deserializeSettings(raw: string): CashbackSettings {
@@ -57,6 +64,22 @@ export function deserializeSettings(raw: string): CashbackSettings {
     cashbackPercent: maybeSettings.cashbackPercent,
     periods: maybeSettings.periods.map(parsePeriod),
   };
+}
+
+export function deserializeClientStatuses(raw: string): ClientStatusMap | null {
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error('Не удалось прочитать JSON настроек.');
+  }
+
+  if (!isRecord(parsed) || !isRecord(parsed.clientStatuses)) {
+    return null;
+  }
+
+  return parseClientStatuses(parsed.clientStatuses);
 }
 
 export function normalizeSettingsForSubscriptions(
@@ -102,6 +125,12 @@ function parsePeriod(raw: unknown): PricePeriod {
       ]),
     ),
   };
+}
+
+function parseClientStatuses(raw: Record<string, unknown>): ClientStatusMap {
+  return Object.fromEntries(
+    Object.entries(raw).filter((entry): entry is [string, boolean] => typeof entry[1] === 'boolean'),
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

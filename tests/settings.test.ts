@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   createInitialSettings,
+  deserializeClientStatuses,
   deserializeSettings,
   serializeSettings,
 } from '../src/domain/settings';
@@ -47,6 +48,26 @@ describe('settings domain', () => {
     const serialized = serializeSettings(settings);
 
     expect(deserializeSettings(serialized)).toEqual(settings);
+  });
+
+  it('сериализует и десериализует статусы клиентов вместе с настройками', () => {
+    const settings = createInitialSettings(purchases);
+    const serialized = serializeSettings(settings, {
+      'Клиент Один': true,
+      'Клиент Два': false,
+    });
+
+    expect(deserializeSettings(serialized)).toEqual(settings);
+    expect(deserializeClientStatuses(serialized)).toEqual({
+      'Клиент Один': true,
+      'Клиент Два': false,
+    });
+  });
+
+  it('сохраняет совместимость со старыми JSON без статусов клиентов', () => {
+    const settings = createInitialSettings(purchases);
+
+    expect(deserializeClientStatuses(serializeSettings(settings))).toBeNull();
   });
 
   it('отклоняет некорректный JSON настроек', () => {

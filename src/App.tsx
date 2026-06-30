@@ -30,6 +30,7 @@ import { createCashbackDocxBlob, downloadBlob, downloadTextFile, summariesToCsv 
 import { loadPurchasesFromUrl } from './domain/excel';
 import {
   createInitialSettings,
+  deserializeClientStatuses,
   deserializeSettings,
   normalizeSettingsForSubscriptions,
   serializeSettings,
@@ -218,7 +219,16 @@ export default function App() {
       return;
     }
 
-    downloadTextFile('cashback-settings.json', serializeSettings(settings), 'application/json;charset=utf-8');
+    const exportedClientStatuses =
+      reportRows.length > 0
+        ? Object.fromEntries(reportRows.map((row) => [row.clientName, row.isActive]))
+        : clientStatuses;
+
+    downloadTextFile(
+      'cashback-settings.json',
+      serializeSettings(settings, exportedClientStatuses),
+      'application/json;charset=utf-8',
+    );
   }
 
   function exportCsv() {
@@ -247,7 +257,12 @@ export default function App() {
       .text()
       .then((content) => {
         const imported = normalizeSettingsForSubscriptions(deserializeSettings(content), subscriptionNames);
+        const importedClientStatuses = deserializeClientStatuses(content);
+
         setSettings(imported);
+        if (importedClientStatuses) {
+          setClientStatuses(importedClientStatuses);
+        }
         setExpandedPeriodIds(new Set(imported.periods.map((period) => period.id)));
         setImportError('');
       })
