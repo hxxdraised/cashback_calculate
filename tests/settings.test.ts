@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createInitialSettings,
   deserializeClientStatuses,
+  deserializeMessageTemplates,
   deserializeSettings,
   serializeSettings,
 } from '../src/domain/settings';
@@ -62,6 +63,25 @@ describe('settings domain', () => {
       'Клиент Один': true,
       'Клиент Два': false,
     });
+  });
+
+  it('serializes and deserializes message templates with settings', () => {
+    const settings = createInitialSettings(purchases);
+    const templates = {
+      baseTemplate: 'Привет, {{clientName}}',
+      conditionalTemplates: [
+        {
+          id: 'cashback-large',
+          field: 'cashback' as const,
+          operator: 'gt' as const,
+          value: 500,
+          text: 'Ваш кешбек {{cashback}}',
+        },
+      ],
+    };
+    const serialized = serializeSettings(settings, {}, templates);
+
+    expect(deserializeMessageTemplates(serialized)).toEqual(templates);
   });
 
   it('сохраняет совместимость со старыми JSON без статусов клиентов', () => {

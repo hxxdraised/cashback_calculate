@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { loadStoredClientStatuses, saveStoredClientStatuses } from '../src/domain/storage';
+import {
+  loadStoredClientStatuses,
+  loadStoredMessageTemplates,
+  saveStoredClientStatuses,
+  saveStoredMessageTemplates,
+} from '../src/domain/storage';
 
 describe('client status storage', () => {
   beforeEach(() => {
@@ -30,5 +35,24 @@ describe('client status storage', () => {
     expect(loadStoredClientStatuses()).toEqual({
       'Анна Иванова': true,
     });
+  });
+
+  it('stores and loads message templates', () => {
+    const templates = {
+      baseTemplate: 'Здравствуйте, {{clientName}}',
+      conditionalTemplates: [
+        {
+          id: 'cashback',
+          field: 'cashback' as const,
+          operator: 'gt' as const,
+          value: 300,
+          text: 'Кешбек {{cashback}}',
+        },
+      ],
+    };
+
+    saveStoredMessageTemplates(templates);
+
+    expect(loadStoredMessageTemplates()).toEqual(templates);
   });
 });

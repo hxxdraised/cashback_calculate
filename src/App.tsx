@@ -1,4 +1,4 @@
-import { ChangeEvent, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { ChangeEvent, ReactNode, TextareaHTMLAttributes, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDown,
   ArrowUp,
@@ -7,10 +7,12 @@ import {
   CalendarDays,
   ChevronDown,
   CircleAlert,
+  Copy,
   Download,
   FileDown,
   FileText,
   FileUp,
+  MessageSquare,
   Percent,
   Plus,
   ReceiptText,
@@ -20,6 +22,7 @@ import {
   UserCheck,
   UserX,
   Wallet,
+  X,
 } from 'lucide-react';
 import dataUrl from '../data/all_21.01.26_30.06.26.xlsx?url';
 import {
@@ -34,17 +37,35 @@ import { loadPurchasesFromUrl } from './domain/excel';
 import {
   createInitialSettings,
   deserializeClientStatuses,
+  deserializeMessageTemplates,
   deserializeSettings,
   normalizeSettingsForSubscriptions,
   serializeSettings,
 } from './domain/settings';
 import {
+  defaultMessageTemplates,
+  messageConditionFields,
+  messageConditionOperators,
+  messageTemplateVariables,
+  renderClientMessage,
+} from './domain/messages';
+import {
   loadStoredClientStatuses,
+  loadStoredMessageTemplates,
   loadStoredSettings,
   saveStoredClientStatuses,
+  saveStoredMessageTemplates,
   saveStoredSettings,
 } from './domain/storage';
-import type { CashbackSettings, ClientStatusMap, PricePeriod, PurchaseRecord } from './domain/types';
+import type {
+  CashbackSettings,
+  ClientCashbackExportRow,
+  ClientStatusMap,
+  ConditionalMessageTemplate,
+  MessageTemplatesSettings,
+  PricePeriod,
+  PurchaseRecord,
+} from './domain/types';
 
 const numberFormat = new Intl.NumberFormat('ru-RU');
 const rubleFormat = new Intl.NumberFormat('ru-RU');
@@ -62,6 +83,16 @@ export default function App() {
       return {};
     }
   });
+  const [messageTemplates, setMessageTemplates] = useState<MessageTemplatesSettings>(() => {
+    try {
+      return loadStoredMessageTemplates();
+    } catch {
+      return defaultMessageTemplates;
+    }
+  });
+  const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<ClientCashbackExportRow | null>(null);
+  const [copiedMessage, setCopiedMessage] = useState(false);
   const [expandedPeriodIds, setExpandedPeriodIds] = useState<Set<string>>(new Set());
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection }>({
     key: 'clientName',
@@ -120,6 +151,10 @@ export default function App() {
     saveStoredClientStatuses(clientStatuses);
   }, [clientStatuses]);
 
+  useEffect(() => {
+    saveStoredMessageTemplates(messageTemplates);
+  }, [messageTemplates]);
+
   const subscriptionNames = useMemo(() => getSubscriptionNames(purchases), [purchases]);
   const eligiblePurchases = useMemo(() => getEligiblePurchases(purchases), [purchases]);
   const validationErrors = useMemo(
@@ -164,6 +199,12 @@ export default function App() {
   }, [reportRows, sortConfig]);
   const activeClientsCount = reportRows.filter((row) => row.isActive).length;
   const inactiveClientsCount = reportRows.length - activeClientsCount;
+  const messageTemplatesCount =
+    (messageTemplates.baseTemplate.trim() ? 1 : 0) + messageTemplates.conditionalTemplates.length;
+  const selectedClientMessage = useMemo(
+    () => (selectedClient ? renderClientMessage(selectedClient, messageTemplates) : ''),
+    [messageTemplates, selectedClient],
+  );
 
   const dateRange = useMemo(() => {
     if (purchases.length === 0) {
@@ -257,7 +298,7 @@ export default function App() {
 
     downloadTextFile(
       'cashback-settings.json',
-      serializeSettings(settings, exportedClientStatuses),
+      serializeSettings(settings, exportedClientStatuses, messageTemplates),
       'application/json;charset=utf-8',
     );
   }
@@ -276,6 +317,73 @@ export default function App() {
       ...current,
       [clientName]: isActive,
     }));
+  }
+
+  function updateMessageTemplates(updater: (current: MessageTemplatesSettings) => MessageTemplatesSettings) {
+    setMessageTemplates((current) => updater(current));
+  }
+
+  function insertVariableToBaseTemplate(variableKey: string) {
+    updateMessageTemplates((current) => ({
+      ...current,
+      baseTemplate: appendTemplateVariable(current.baseTemplate, variableKey),
+    }));
+  }
+
+  function insertVariableToConditionalTemplate(templateId: string, variableKey: string) {
+    updateMessageTemplates((current) => ({
+      ...current,
+      conditionalTemplates: current.conditionalTemplates.map((template) =>
+        template.id === templateId
+          ? { ...template, text: appendTemplateVariable(template.text, variableKey) }
+          : template,
+      ),
+    }));
+  }
+
+  function addConditionalTemplate() {
+    updateMessageTemplates((current) => ({
+      ...current,
+      conditionalTemplates: [
+        ...current.conditionalTemplates,
+        {
+          id: crypto.randomUUID(),
+          field: 'cashback',
+          operator: 'gt',
+          value: 0,
+          text: '',
+        },
+      ],
+    }));
+  }
+
+  function updateConditionalTemplate(
+    templateId: string,
+    updater: (template: ConditionalMessageTemplate) => ConditionalMessageTemplate,
+  ) {
+    updateMessageTemplates((current) => ({
+      ...current,
+      conditionalTemplates: current.conditionalTemplates.map((template) =>
+        template.id === templateId ? updater(template) : template,
+      ),
+    }));
+  }
+
+  function removeConditionalTemplate(templateId: string) {
+    updateMessageTemplates((current) => ({
+      ...current,
+      conditionalTemplates: current.conditionalTemplates.filter((template) => template.id !== templateId),
+    }));
+  }
+
+  async function copySelectedClientMessage() {
+    if (!selectedClientMessage) {
+      return;
+    }
+
+    await navigator.clipboard.writeText(selectedClientMessage);
+    setCopiedMessage(true);
+    window.setTimeout(() => setCopiedMessage(false), 1800);
   }
 
   function toggleSort(key: SortKey) {
@@ -304,10 +412,14 @@ export default function App() {
       .then((content) => {
         const imported = normalizeSettingsForSubscriptions(deserializeSettings(content), subscriptionNames);
         const importedClientStatuses = deserializeClientStatuses(content);
+        const importedMessageTemplates = deserializeMessageTemplates(content);
 
         setSettings(imported);
         if (importedClientStatuses) {
           setClientStatuses(importedClientStatuses);
+        }
+        if (importedMessageTemplates) {
+          setMessageTemplates(importedMessageTemplates);
         }
         setExpandedPeriodIds(new Set(imported.periods.map((period) => period.id)));
         setImportError('');
@@ -365,10 +477,60 @@ export default function App() {
 
       <section className="workspace">
         <section className="settings-panel" aria-labelledby="settings-title">
+          <div className="settings-card-heading">
+            <p className="eyebrow" id="settings-title">Настройки</p>
+          </div>
+
+          <section className="settings-item" aria-labelledby="message-templates-title">
+            <div>
+              <h2 id="message-templates-title">
+                <MessageSquare size={20} aria-hidden="true" />
+                Шаблоны сообщений
+              </h2>
+              <p className="section-copy">
+                Основной текст и условия для персональных сообщений клиентам по итогам расчета.
+              </p>
+            </div>
+            <div className="template-card-footer">
+              <div className="template-count" aria-label={`Добавлено шаблонов: ${messageTemplatesCount}`}>
+                <strong>{messageTemplatesCount}</strong>
+                <span>шаблонов</span>
+              </div>
+              <button type="button" className="button-with-icon" onClick={() => setIsTemplatesModalOpen(true)}>
+                <Settings size={17} aria-hidden="true" />
+                Настроить
+              </button>
+            </div>
+          </section>
+
+          <section className="settings-item" aria-labelledby="cashback-percent-title">
+            <div>
+              <h2 id="cashback-percent-title">
+                <Percent size={20} aria-hidden="true" />
+                Процент кешбека
+              </h2>
+              <p className="section-copy">Используется для расчета суммы кешбека по каждому клиенту.</p>
+            </div>
+            <label className="cashback-input">
+              <span className="visually-hidden">Процент кешбека</span>
+              <input
+                type="number"
+                min="0"
+                step="0.1"
+                value={settings.cashbackPercent}
+                onChange={(event) =>
+                  updateSettings((current) => ({
+                    ...current,
+                    cashbackPercent: Number(event.target.value),
+                  }))
+                }
+              />
+            </label>
+          </section>
+
           <div className="section-heading">
             <div>
-              <p className="eyebrow">Настройки</p>
-              <h2 id="settings-title">
+              <h2>
                 <Settings size={20} aria-hidden="true" />
                 Периоды цен
                 {validationErrors.length > 0 ? (
@@ -382,25 +544,6 @@ export default function App() {
               <p className="section-copy">Заполните цены для каждого периода, чтобы расчет стал доступен.</p>
             </div>
           </div>
-
-          <label className="cashback-input">
-            <span>
-              <Percent size={18} aria-hidden="true" />
-              Процент кешбека
-            </span>
-            <input
-              type="number"
-              min="0"
-              step="0.1"
-              value={settings.cashbackPercent}
-              onChange={(event) =>
-                updateSettings((current) => ({
-                  ...current,
-                  cashbackPercent: Number(event.target.value),
-                }))
-              }
-            />
-          </label>
 
           <div className="period-list">
             {settings.periods.map((period) => {
@@ -619,10 +762,30 @@ export default function App() {
                   </tr>
                 ) : (
                   sortedReportRows.map((summary, index) => (
-                    <tr key={summary.clientName}>
+                    <tr
+                      key={summary.clientName}
+                      className="client-row"
+                      tabIndex={0}
+                      onClick={() => {
+                        setSelectedClient(summary);
+                        setCopiedMessage(false);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          setSelectedClient(summary);
+                          setCopiedMessage(false);
+                        }
+                      }}
+                    >
                       <td className="number-column">{index + 1}</td>
                       <td className="active-column">
-                        <label className="status-checkbox" title={summary.isActive ? 'Активен' : 'Неактивен'}>
+                        <label
+                          className="status-checkbox"
+                          title={summary.isActive ? 'Активен' : 'Неактивен'}
+                          onClick={(event) => event.stopPropagation()}
+                          onKeyDown={(event) => event.stopPropagation()}
+                        >
                           <input
                             type="checkbox"
                             checked={summary.isActive}
@@ -645,6 +808,198 @@ export default function App() {
           </div>
         </section>
       </section>
+
+      {isTemplatesModalOpen ? (
+        <div className="modal-backdrop" role="presentation">
+          <section
+            className="modal-panel template-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="message-template-modal-title"
+          >
+            <div className="modal-header">
+              <div>
+                <p className="eyebrow">Рассылка</p>
+                <h2 id="message-template-modal-title">
+                  <MessageSquare size={20} aria-hidden="true" />
+                  Шаблоны сообщений
+                </h2>
+              </div>
+              <button
+                type="button"
+                className="icon-button"
+                aria-label="Закрыть настройки шаблонов"
+                onClick={() => setIsTemplatesModalOpen(false)}
+              >
+                <X size={18} aria-hidden="true" />
+              </button>
+            </div>
+
+            <div className="template-editor">
+              <label className="template-field">
+                <span>Основной шаблон</span>
+                <AutoSizeTextarea
+                  value={messageTemplates.baseTemplate}
+                  onChange={(event) =>
+                    updateMessageTemplates((current) => ({ ...current, baseTemplate: event.target.value }))
+                  }
+                />
+              </label>
+              <VariableButtons onInsert={insertVariableToBaseTemplate} />
+              <p className="template-hint">
+                Можно использовать выражения с числовыми переменными, например <code>{'{{6800-cashback}}'}</code>.
+              </p>
+
+              <div className="conditional-header">
+                <div>
+                  <h3>Условные шаблоны</h3>
+                  <p>Первый подходящий шаблон заменит основной текст для клиента.</p>
+                </div>
+                <button type="button" className="button-with-icon secondary-button" onClick={addConditionalTemplate}>
+                  <Plus size={17} aria-hidden="true" />
+                  Добавить условие
+                </button>
+              </div>
+
+              <div className="conditional-list">
+                {messageTemplates.conditionalTemplates.length === 0 ? (
+                  <div className="empty-template-state">Условные шаблоны пока не добавлены.</div>
+                ) : (
+                  messageTemplates.conditionalTemplates.map((template, index) => (
+                    <article className="conditional-template" key={template.id}>
+                      <div className="conditional-template-title">
+                        <strong>Условие {index + 1}</strong>
+                        <button
+                          type="button"
+                          className="ghost-button button-with-icon"
+                          onClick={() => removeConditionalTemplate(template.id)}
+                        >
+                          <Trash2 size={16} aria-hidden="true" />
+                          Удалить
+                        </button>
+                      </div>
+
+                      <div className="condition-row">
+                        <label>
+                          <span>Переменная</span>
+                          <select
+                            value={template.field}
+                            onChange={(event) =>
+                              updateConditionalTemplate(template.id, (current) => ({
+                                ...current,
+                                field: event.target.value as ConditionalMessageTemplate['field'],
+                              }))
+                            }
+                          >
+                            {messageConditionFields.map((field) => (
+                              <option key={field.value} value={field.value}>
+                                {field.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label>
+                          <span>Знак</span>
+                          <select
+                            value={template.operator}
+                            onChange={(event) =>
+                              updateConditionalTemplate(template.id, (current) => ({
+                                ...current,
+                                operator: event.target.value as ConditionalMessageTemplate['operator'],
+                              }))
+                            }
+                          >
+                            {messageConditionOperators.map((operator) => (
+                              <option key={operator.value} value={operator.value}>
+                                {operator.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label>
+                          <span>Значение</span>
+                          <input
+                            type="number"
+                            value={template.value}
+                            onChange={(event) =>
+                              updateConditionalTemplate(template.id, (current) => ({
+                                ...current,
+                                value: Number(event.target.value),
+                              }))
+                            }
+                          />
+                        </label>
+                      </div>
+
+                      <label className="template-field">
+                        <span>Текст шаблона</span>
+                        <AutoSizeTextarea
+                          value={template.text}
+                          onChange={(event) =>
+                            updateConditionalTemplate(template.id, (current) => ({
+                              ...current,
+                              text: event.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                      <VariableButtons onInsert={(variableKey) => insertVariableToConditionalTemplate(template.id, variableKey)} />
+                    </article>
+                  ))
+                )}
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {selectedClient ? (
+        <div className="modal-backdrop" role="presentation">
+          <section
+            className="modal-panel client-message-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="client-message-modal-title"
+          >
+            <div className="modal-header">
+              <div>
+                <p className="eyebrow">Сообщение клиенту</p>
+                <h2 id="client-message-modal-title">
+                  <MessageSquare size={20} aria-hidden="true" />
+                  {selectedClient.clientName}
+                </h2>
+              </div>
+              <button
+                type="button"
+                className="icon-button"
+                aria-label="Закрыть сообщение клиента"
+                onClick={() => setSelectedClient(null)}
+              >
+                <X size={18} aria-hidden="true" />
+              </button>
+            </div>
+
+            <div className="client-message-grid">
+              <InfoTile label="Статус" value={selectedClient.isActive ? 'Активен' : 'Неактивен'} />
+              <InfoTile label="Покупок" value={String(selectedClient.purchasesCount)} />
+              <InfoTile label="Потрачено" value={`${numberFormat.format(selectedClient.calculatedTotal)} ₽`} />
+              <InfoTile label="Кешбек" value={`${numberFormat.format(selectedClient.cashback)} ₽`} />
+            </div>
+
+            <label className="template-field">
+              <span>Сообщение для рассылки</span>
+              <AutoSizeTextarea value={selectedClientMessage} minRows={7} readOnly />
+            </label>
+
+            <div className="modal-actions">
+              <button type="button" className="button-with-icon" onClick={copySelectedClientMessage}>
+                <Copy size={17} aria-hidden="true" />
+                {copiedMessage ? 'Скопировано' : 'Скопировать'}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }
@@ -656,6 +1011,60 @@ function formatDateKeyRu(dateKey: string): string {
 
   const [year, month, day] = dateKey.split('-');
   return `${day}.${month}.${year}`;
+}
+
+function appendTemplateVariable(template: string, variableKey: string): string {
+  const token = `{{${variableKey}}}`;
+
+  return template.trimEnd() ? `${template.trimEnd()} ${token}` : token;
+}
+
+function VariableButtons({ onInsert }: { onInsert: (variableKey: string) => void }) {
+  return (
+    <div className="variable-list" aria-label="Переменные шаблона">
+      {messageTemplateVariables.map((variable) => (
+        <button
+          type="button"
+          className="variable-button"
+          key={variable.key}
+          onClick={() => onInsert(variable.key)}
+        >
+          <span>{variable.label}</span>
+          <code>{`{{${variable.key}}}`}</code>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function AutoSizeTextarea({
+  minRows = 5,
+  value,
+  ...props
+}: TextareaHTMLAttributes<HTMLTextAreaElement> & { minRows?: number; value: string }) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const textarea = textareaRef.current;
+
+    if (!textarea) {
+      return;
+    }
+
+    textarea.style.height = 'auto';
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }, [value]);
+
+  return <textarea {...props} ref={textareaRef} value={value} rows={minRows} />;
+}
+
+function InfoTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="info-tile">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
 }
 
 function SortableHeader({

@@ -57,4 +57,19 @@ describe('period form markup', () => {
     expect(source).toContain('<ArrowDown size={14}');
     expect(styles).toContain('.sort-button');
   });
+
+  it('renders message template settings and client message modal hooks', () => {
+    const source = readFileSync('src/App.tsx', 'utf8');
+    const styles = readFileSync('src/styles.css', 'utf8');
+
+    expect(source).toContain('Шаблоны сообщений');
+    expect(source).toContain('messageTemplatesCount');
+    expect(source).toContain('renderClientMessage');
+    expect(source).toContain('setSelectedClient(summary)');
+    expect(source).toContain('serializeSettings(settings, exportedClientStatuses, messageTemplates)');
+    expect(source).toContain('deserializeMessageTemplates(content)');
+    expect(styles).toContain('.settings-item');
+    expect(styles).toContain('.modal-panel');
+    expect(styles).toContain('.variable-button');
+  });
 });

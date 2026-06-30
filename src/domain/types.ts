@@ -34,6 +34,22 @@ export interface ClientCashbackExportRow extends ClientCashbackSummary {
   isActive: boolean;
 }
 
+export type MessageConditionField = 'purchasesCount' | 'calculatedTotal' | 'cashback';
+export type MessageConditionOperator = 'gt' | 'lt' | 'eq';
+
+export interface ConditionalMessageTemplate {
+  id: string;
+  field: MessageConditionField;
+  operator: MessageConditionOperator;
+  value: number;
+  text: string;
+}
+
+export interface MessageTemplatesSettings {
+  baseTemplate: string;
+  conditionalTemplates: ConditionalMessageTemplate[];
+}
+
 export interface PurchaseCalculation {
   purchase: PurchaseRecord;
   period: PricePeriod;

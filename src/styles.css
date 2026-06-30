@@ -33,7 +33,9 @@ body,
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -86,6 +88,42 @@ input:hover {
 }
 
 input:focus {
+  border-color: #17655e;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(23, 101, 94, 0.15);
+}
+
+select,
+textarea {
+  width: 100%;
+  border: 1px solid #c9d1cd;
+  border-radius: 6px;
+  color: #202725;
+  background: #ffffff;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+select {
+  min-height: 36px;
+  padding: 7px 10px;
+}
+
+textarea {
+  min-height: 110px;
+  padding: 10px 12px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+select:hover,
+textarea:hover {
+  border-color: #aeb9b4;
+}
+
+select:focus,
+textarea:focus {
   border-color: #17655e;
   outline: none;
   box-shadow: 0 0 0 3px rgba(23, 101, 94, 0.15);
@@ -359,6 +397,14 @@ h2 {
   margin-bottom: 16px;
 }
 
+.settings-card-heading {
+  margin-bottom: 14px;
+}
+
+.settings-card-heading .eyebrow {
+  margin-bottom: 0;
+}
+
 .report-counters {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -396,22 +442,48 @@ h2 {
 }
 
 .cashback-input {
-  display: grid;
-  grid-template-columns: 1fr 118px;
-  align-items: center;
-  gap: 12px;
-  border: 1px solid #e1e8e4;
-  border-radius: 10px;
-  margin: 0 0 16px;
-  padding: 12px;
-  font-weight: 800;
-  background: #f8faf9;
+  display: block;
+  width: 118px;
 }
 
-.cashback-input span {
-  display: inline-flex;
+.settings-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
   align-items: center;
-  gap: 8px;
+  border-bottom: 1px solid #e3e9e6;
+  margin-bottom: 16px;
+  padding: 0 0 16px;
+}
+
+.template-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.template-count {
+  display: grid;
+  place-items: center;
+  min-width: 86px;
+  border: 1px solid #d9e5e0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #ffffff;
+}
+
+.template-count strong {
+  color: #17655e;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.template-count span {
+  margin-top: 4px;
+  color: #61706b;
+  font-size: 0.78rem;
+  font-weight: 800;
 }
 
 .period-list {
@@ -578,6 +650,15 @@ tbody tr:hover {
   background: #f7faf8;
 }
 
+.client-row {
+  cursor: pointer;
+}
+
+.client-row:focus-visible {
+  outline: 3px solid rgba(23, 101, 94, 0.2);
+  outline-offset: -3px;
+}
+
 th {
   color: #52625f;
   font-size: 0.8rem;
@@ -680,6 +761,200 @@ th.active-column {
   text-align: center;
 }
 
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(17, 29, 26, 0.42);
+  backdrop-filter: blur(4px);
+}
+
+.modal-panel {
+  width: min(760px, 100%);
+  max-height: calc(100vh - 36px);
+  overflow: auto;
+  border: 1px solid rgba(212, 225, 220, 0.95);
+  border-radius: 12px;
+  padding: 20px;
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgba(22, 35, 32, 0.26);
+}
+
+.template-modal {
+  width: min(920px, 100%);
+}
+
+.modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  min-width: 38px;
+  padding: 0;
+}
+
+.template-editor,
+.conditional-list {
+  display: grid;
+  gap: 14px;
+}
+
+.template-field {
+  display: grid;
+  gap: 7px;
+  color: #51605d;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.template-field textarea {
+  min-height: 8.25rem;
+  overflow: hidden;
+  font-weight: 400;
+}
+
+.variable-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.variable-button {
+  display: inline-grid;
+  min-height: 34px;
+  grid-template-columns: auto auto;
+  align-items: center;
+  gap: 7px;
+  border-color: #d6e1dc;
+  padding: 6px 10px;
+  color: #263633;
+  background: #f7faf8;
+  box-shadow: none;
+}
+
+.variable-button:hover:not(:disabled) {
+  border-color: #17655e;
+  color: #17655e;
+  background: #eef8f4;
+  box-shadow: none;
+  transform: none;
+}
+
+.variable-button code {
+  color: #17655e;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.template-hint {
+  margin: -4px 0 0;
+  color: #61706b;
+  font-size: 0.86rem;
+}
+
+.template-hint code {
+  color: #17655e;
+  font-weight: 800;
+}
+
+.conditional-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid #e5ece8;
+  padding-top: 16px;
+}
+
+.conditional-header h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.conditional-header p {
+  margin: 5px 0 0;
+  color: #61706b;
+  font-size: 0.9rem;
+}
+
+.conditional-template,
+.empty-template-state {
+  border: 1px solid #e1e8e4;
+  border-radius: 10px;
+  padding: 14px;
+  background: #fbfdfc;
+}
+
+.empty-template-state {
+  color: #63716e;
+  text-align: center;
+}
+
+.conditional-template-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.condition-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(130px, 0.8fr) 120px;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.condition-row label {
+  display: grid;
+  gap: 5px;
+  color: #51605d;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.client-message-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.info-tile {
+  display: grid;
+  gap: 5px;
+  border: 1px solid #e1e8e4;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #f8faf9;
+}
+
+.info-tile span {
+  color: #61706b;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.info-tile strong {
+  overflow-wrap: break-word;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -748,7 +1023,9 @@ th.active-column {
 
   .metrics,
   .period-controls,
-  .cashback-input {
+  .settings-item,
+  .condition-row,
+  .client-message-grid {
     grid-template-columns: 1fr;
   }
 
@@ -768,6 +1045,21 @@ th.active-column {
   .header-actions,
   .report-actions {
     flex-direction: column;
+  }
+
+  .template-card-footer,
+  .conditional-header,
+  .conditional-template-title,
+  .modal-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .template-card-footer button,
+  .conditional-header button,
+  .conditional-template-title button,
+  .modal-actions button {
+    width: 100%;
   }
 
   .report-counters {

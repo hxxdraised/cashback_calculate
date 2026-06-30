@@ -1,8 +1,10 @@
 import { deserializeSettings, serializeSettings } from './settings';
-import type { CashbackSettings, ClientStatusMap } from './types';
+import { defaultMessageTemplates, normalizeMessageTemplates } from './messages';
+import type { CashbackSettings, ClientStatusMap, MessageTemplatesSettings } from './types';
 
 const storageKey = 'cashback-calculate-settings';
 const clientStatusesStorageKey = 'cashback-calculate-client-statuses';
+const messageTemplatesStorageKey = 'cashback-calculate-message-templates';
 
 export function loadStoredSettings(): CashbackSettings | null {
   const raw = localStorage.getItem(storageKey);
@@ -35,4 +37,17 @@ export function loadStoredClientStatuses(): ClientStatusMap {
 
 export function saveStoredClientStatuses(statuses: ClientStatusMap): void {
   localStorage.setItem(clientStatusesStorageKey, JSON.stringify(statuses));
+}
+
+export function loadStoredMessageTemplates(): MessageTemplatesSettings {
+  const raw = localStorage.getItem(messageTemplatesStorageKey);
+  if (!raw) {
+    return defaultMessageTemplates;
+  }
+
+  return normalizeMessageTemplates(JSON.parse(raw) as unknown);
+}
+
+export function saveStoredMessageTemplates(settings: MessageTemplatesSettings): void {
+  localStorage.setItem(messageTemplatesStorageKey, JSON.stringify(settings));
 }

@@ -1,5 +1,12 @@
 import { getSubscriptionNames, toDateKey } from './cashback';
-import type { CashbackSettings, ClientStatusMap, PricePeriod, PurchaseRecord } from './types';
+import { normalizeMessageTemplates } from './messages';
+import type {
+  CashbackSettings,
+  ClientStatusMap,
+  MessageTemplatesSettings,
+  PricePeriod,
+  PurchaseRecord,
+} from './types';
 
 const settingsVersion = 1;
 
@@ -7,6 +14,7 @@ interface SettingsFile {
   version: number;
   settings: CashbackSettings;
   clientStatuses?: ClientStatusMap;
+  messageTemplates?: MessageTemplatesSettings;
 }
 
 export function createInitialSettings(purchases: PurchaseRecord[]): CashbackSettings {
@@ -27,11 +35,19 @@ export function createInitialSettings(purchases: PurchaseRecord[]): CashbackSett
   };
 }
 
-export function serializeSettings(settings: CashbackSettings, clientStatuses?: ClientStatusMap): string {
+export function serializeSettings(
+  settings: CashbackSettings,
+  clientStatuses?: ClientStatusMap,
+  messageTemplates?: MessageTemplatesSettings,
+): string {
   const file: SettingsFile = { version: settingsVersion, settings };
 
   if (clientStatuses) {
     file.clientStatuses = clientStatuses;
+  }
+
+  if (messageTemplates) {
+    file.messageTemplates = messageTemplates;
   }
 
   return JSON.stringify(file, null, 2);
@@ -80,6 +96,22 @@ export function deserializeClientStatuses(raw: string): ClientStatusMap | null {
   }
 
   return parseClientStatuses(parsed.clientStatuses);
+}
+
+export function deserializeMessageTemplates(raw: string): MessageTemplatesSettings | null {
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error('Не удалось прочитать JSON настроек.');
+  }
+
+  if (!isRecord(parsed) || !('messageTemplates' in parsed)) {
+    return null;
+  }
+
+  return normalizeMessageTemplates(parsed.messageTemplates);
 }
 
 export function normalizeSettingsForSubscriptions(
